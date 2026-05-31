@@ -35,8 +35,8 @@ TARGET = "consumer_sentiment"
 
 # ── Train / test split ─────────────────────────────────────────────────────────
 
-train = df[df["quarter"] <= "2022Q2"]
-test  = df[df["quarter"] >= "2022Q3"]
+train = df[df.index <= "2020-02-29"]
+test  = df[df.index >  "2020-02-29"]
 
 X_train_m1, y_train = train[FEATURES_M1], train[TARGET]
 X_test_m1,  y_test  = test[FEATURES_M1],  test[TARGET]
@@ -72,7 +72,7 @@ def evaluate(name, y_true, y_pred):
     print(f"  R²   : {r2:.4f}")
 
 print("=" * 40)
-print("Test-set performance (2022 Q3 onwards)")
+print("Test-set performance (2020 March onwards)")
 print("=" * 40)
 evaluate("Model 1 (no real wages)", y_test, m1.predict(X_test_m1))
 evaluate("Model 2 (+ real wages)",  y_test, m2.predict(X_test_m2))
@@ -91,7 +91,7 @@ for model, features, label in [
 
 # ── Plot ───────────────────────────────────────────────────────────────────────
 
-split_date = pd.Timestamp("2022-07-01")
+split_date = pd.Timestamp("2020-03-01")
 
 fig, axes = plt.subplots(2, 1, figsize=(13, 9), sharex=True)
 titles = ["Model 1: CPI + Mortgage predictors", "Model 2: + Real Wages"]
@@ -115,7 +115,7 @@ for ax, pred_col, title in zip(axes, ["pred_m1", "pred_m2"], titles):
     ax.grid(axis="y", which="minor", linestyle=":", alpha=0.2)
 
     # Annotate split
-    ax.text(split_date, ax.get_ylim()[0] + 2, " 2022 Q3\n split", fontsize=8,
+    ax.text(split_date, ax.get_ylim()[0] + 2, " Mar 2020\n split", fontsize=8,
             color="steelblue", va="bottom")
 
 axes[-1].set_xlabel("Quarter")

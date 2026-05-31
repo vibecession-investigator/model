@@ -1,6 +1,6 @@
 """
 Fetch economic data from FRED (Federal Reserve Economic Data) and produce
-a quarterly CSV dataset from 1980 Q1 through 2025 Q4.
+a monthly CSV dataset starting from when all rolling windows are warm (~late 1980).
 
 Requires a free FRED API key: https://fred.stlouisfed.org/docs/api/api_key.html
 Set it via environment variable:  export FRED_API_KEY=your_key_here
@@ -69,16 +69,18 @@ def fetch(series_id: str) -> pd.Series:
     return s
 
 
-def to_quarterly(s: pd.Series) -> pd.Series:
-    """Resample any frequency to quarterly-end averages."""
-    return s.resample("Q").mean()
+def to_monthly(s: pd.Series, quarterly: bool = False) -> pd.Series:
+    """Resample to month-end. Weekly/daily → mean. Quarterly → forward-fill."""
+    if quarterly:
+        return s.resample("M").ffill()
+    return s.resample("M").mean()
 
 
 def rolling_avg(s: pd.Series, years: int) -> pd.Series:
-    """Mean of the preceding `years` years of quarterly data (current quarter excluded).
+    """Mean of the preceding `years` years of monthly data (current month excluded).
     Returns NaN until a full window of preceding data exists."""
-    quarters = years * 4
-    return s.rolling(window=quarters, min_periods=quarters).mean().shift(1)
+    months = years * 12
+    return s.rolling(window=months, min_periods=months).mean().shift(1)
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -92,38 +94,35 @@ def main():
         raw[col] = fetch(sid)
         time.sleep(0.5)
 
-    print("Resampling to quarterly…")
-    q = {}
+    print("Resampling to monthly…")
+    m = {}
     for col, s in raw.items():
-        q[col] = to_quarterly(s)
+        m[col] = to_monthly(s, quarterly=(col == "real_wages"))
 
     print("Computing CPI year-on-year change…")
-    q["cpi"] = q["cpi"].pct_change(4) * 100   # % change vs same quarter prior year
+    m["cpi"] = m["cpi"].pct_change(12) * 100   # % change vs same month prior year
 
     print("Computing rolling averages and deviations…")
-    q["cpi_5yr_avg"]       = rolling_avg(q["cpi"],          5)
-    q["cpi_10yr_avg"]      = rolling_avg(q["cpi"],         10)
-    q["mortgage_5yr_avg"]  = rolling_avg(q["mortgage_30yr"], 5)
-    q["mortgage_10yr_avg"] = rolling_avg(q["mortgage_30yr"], 10)
+    m["cpi_5yr_avg"]       = rolling_avg(m["cpi"],          5)
+    m["cpi_10yr_avg"]      = rolling_avg(m["cpi"],         10)
+    m["mortgage_5yr_avg"]  = rolling_avg(m["mortgage_30yr"], 5)
+    m["mortgage_10yr_avg"] = rolling_avg(m["mortgage_30yr"], 10)
 
-    q["cpi-cpi5"]          = q["cpi"] - q["cpi_5yr_avg"]
-    q["cpi-cpi10"]         = q["cpi"] - q["cpi_10yr_avg"]
-    q["mortgage-mortgage5"]  = q["mortgage_30yr"] - q["mortgage_5yr_avg"]
-    q["mortgage-mortgage10"] = q["mortgage_30yr"] - q["mortgage_10yr_avg"]
+    m["cpi-cpi5"]            = m["cpi"] - m["cpi_5yr_avg"]
+    m["cpi-cpi10"]           = m["cpi"] - m["cpi_10yr_avg"]
+    m["mortgage-mortgage5"]  = m["mortgage_30yr"] - m["mortgage_5yr_avg"]
+    m["mortgage-mortgage10"] = m["mortgage_30yr"] - m["mortgage_10yr_avg"]
 
     print("Building final dataset…")
-    df = pd.DataFrame(q)
+    df = pd.DataFrame(m)
 
-    # Trim to end date then drop any rows where a window wasn't yet full
+    # Drop any rows where a window wasn't yet full
     df = df.loc[:"2025-12-31"].dropna().copy()
 
-    # Friendly quarter label
     df.index.name = "period_end"
-    df.insert(0, "quarter", df.index.to_period("Q").astype(str))
 
     # Column order
     df = df[[
-        "quarter",
         "real_wages",
         "unemployment_u3",
         "cpi",
