@@ -14,3 +14,6 @@ A visualisation of both models:
 
 <img width="1934" height="1369" alt="model_predictions" src="https://github.com/user-attachments/assets/3c8f7711-0bc7-4ebd-832c-92c6d568094f" />
 
+Here, we use monthly data and set the training cutoff to February 2020 to ensure that none of the COVID-19 pandemic is included in the training set (for some reason):
+
+<img width="1934" height="1368" alt="model_predictions" src="https://github.com/user-attachments/assets/d3526c51-8278-4c9f-bfa8-9f1bbed2bf72" />
